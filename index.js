@@ -4,11 +4,10 @@ const axios = require("axios");
 const app = express();
 app.use(express.json());
 
-// ⚠️ 填你的 OpenAI API Key
 const OPENAI_API_KEY = "貼你的API key";
 
-// ⚠️ 等等Render會給你
-const LINE_TOKEN = "先空著";
+const LINE_TOKEN = process.env.LINE_TOKEN;
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
 async function askAI(message) {
   const res = await axios.post(
