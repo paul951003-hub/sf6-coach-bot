@@ -4,27 +4,28 @@ const axios = require("axios");
 const app = express();
 app.use(express.json());
 
-const OPENAI_API_KEY = "貼你的API key";
-
+// ✅ 從 Render 環境變數拿（安全）
 const LINE_TOKEN = process.env.LINE_TOKEN;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
+// 🧠 AI教練
 async function askAI(message) {
-  const res = await axios.post(
-    "https://api.openai.com/v1/chat/completions",
-    {
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content: `
+  try {
+    const res = await axios.post(
+      "https://api.openai.com/v1/chat/completions",
+      {
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: `
 你是SF6（快打旋風6）專業教練AI。
 
 規則：
 - 用教練語氣
 - 只講重點
 - 每次只抓1個核心問題
-- 要給可執行訓練
+- 提供可執行訓練
 - 像職業教練一樣直接
 
 輸出格式：
@@ -33,24 +34,34 @@ async function askAI(message) {
 3. 訓練方法
 4. 下一步
 `
-        },
-        { role: "user", content: message }
-      ]
-    },
-    {
-      headers: {
-        Authorization: `Bearer ${OPENAI_API_KEY}`
+          },
+          { role: "user", content: message }
+        ]
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${OPENAI_API_KEY}`,
+          "Content-Type": "application/json"
+        }
       }
-    }
-  );
+    );
 
-  return res.data.choices[0].message.content;
+    return res.data.choices[0].message.content;
+  } catch (err) {
+    console.log("AI ERROR:", err.response?.data || err.message);
+    return "AI暫時出問題，請稍後再試";
+  }
 }
 
-// LINE webhook入口
+// 📱 LINE webhook
 app.post("/webhook", async (req, res) => {
   try {
-    const event = req.body.events[0];
+    const event = req.body.events?.[0];
+
+    if (!event || !event.message) {
+      return res.send("OK");
+    }
+
     const userMessage = event.message.text;
 
     const reply = await askAI(userMessage);
@@ -70,11 +81,14 @@ app.post("/webhook", async (req, res) => {
 
     res.send("OK");
   } catch (err) {
-    console.log(err);
-    res.send("error");
+    console.log("WEBHOOK ERROR:", err.message);
+    res.send("OK");
   }
 });
 
-app.listen(3000, () => {
-  console.log("SF6 Coach running");
+// 🚀 port（Render 必須這樣寫）
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+  console.log("SF6 Coach running on port " + PORT);
 });
