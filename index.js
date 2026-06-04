@@ -4,9 +4,11 @@ const axios = require("axios");
 const app = express();
 app.use(express.json());
 
+// ENV
 const LINE_TOKEN = process.env.LINE_TOKEN;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
+// AI
 async function askAI(message) {
   try {
     const res = await axios.post(
@@ -17,9 +19,12 @@ async function askAI(message) {
           {
             role: "system",
             content:
-              "You are a Street Fighter 6 coach. Give short, practical coaching advice."
+              "You are a Street Fighter 6 coach. Give short, practical, actionable advice."
           },
-          { role: "user", content: message }
+          {
+            role: "user",
+            content: message
+          }
         ]
       },
       {
@@ -32,17 +37,29 @@ async function askAI(message) {
 
     return res.data.choices[0].message.content;
   } catch (err) {
-    console.log("AI error:", err.response?.data || err.message);
+    console.log("OPENAI ERROR:", err.response?.data || err.message);
     return "AI error";
   }
 }
 
+// WEBHOOK
 app.post("/webhook", async (req, res) => {
   try {
-    const event = req.body.events?.[0];
-    if (!event || !event.message) return res.send("OK");
+    console.log("WEBHOOK RECEIVED");
+
+    const event = req.body.events && req.body.events[0];
+
+    if (!event || !event.message) {
+      return res.send("OK");
+    }
+
+    if (event.message.type !== "text") {
+      return res.send("OK");
+    }
 
     const userMessage = event.message.text;
+
+    console.log("USER:", userMessage);
 
     const reply = await askAI(userMessage);
 
@@ -50,7 +67,12 @@ app.post("/webhook", async (req, res) => {
       "https://api.line.me/v2/bot/message/reply",
       {
         replyToken: event.replyToken,
-        messages: [{ type: "text", text: reply }]
+        messages: [
+          {
+            type: "text",
+            text: reply
+          }
+        ]
       },
       {
         headers: {
@@ -59,13 +81,21 @@ app.post("/webhook", async (req, res) => {
       }
     );
 
+    console.log("REPLY SENT");
+
     res.send("OK");
   } catch (err) {
-    console.log("Webhook error:", err.message);
+    console.log("WEBHOOK ERROR:", err.response?.data || err.message);
     res.send("OK");
   }
 });
 
+// HEALTH CHECK
+app.get("/", (req, res) => {
+  res.send("SF6 Coach is running");
+});
+
+// PORT
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
